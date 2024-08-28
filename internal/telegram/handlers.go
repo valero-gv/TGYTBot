@@ -1,18 +1,17 @@
 package telegram
 
 import (
-	"bufio"
-	"fmt"
+	"TGYTBot/internal/youtube"
 	"gopkg.in/telebot.v3"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 )
 
 type Bot struct {
-	Bot *telebot.Bot
+	Bot  *telebot.Bot
+	Auth youtube.Auth
 }
 
 // Клавиатура с кнопками
@@ -21,18 +20,22 @@ var mainMenu = &telebot.ReplyMarkup{
 }
 
 var (
-	btnDownload = mainMenu.Text("Скачать видео")
+	btnDownload            = mainMenu.Text("Скачать видео")
+	btnAuthorize           = telebot.Btn{Text: "Авторизация в YouTube"}
+	btnViewRecommendations = telebot.Btn{Text: "Показать рекомендации YouTube"}
 )
 
 func (b *Bot) InitHandlers() {
 	b.Bot.Handle("/start", b.handleStart)
 	b.Bot.Handle(&btnDownload, b.handleDownloadRequest)
+	b.Bot.Handle(&btnAuthorize, b.handleYouTubeAuth)
 }
 
 // handleStart обработчик команды /start
 func (b *Bot) handleStart(c telebot.Context) error {
 	mainMenu.Reply(
 		mainMenu.Row(btnDownload),
+		mainMenu.Row(btnAuthorize),
 	)
 	return c.Send("Выберите команду:", mainMenu)
 }
@@ -47,50 +50,16 @@ func (b *Bot) HandleDownloadVideo(c telebot.Context) error {
 	if videoURL == "" {
 		return c.Send("Пожалуйста, отправьте ссылку на видео.")
 	}
+	c.Send("Скачивание началось.")
 
 	filePath := "video_" + time.Now().Format("20060102150405") + ".mp4"
 
-	cmd := exec.Command("yt-dlp", "-o", filePath, videoURL)
-	// Создаем pipe для чтения вывода yt-dlp
-	stdout, err := cmd.StdoutPipe()
+	cmd := exec.Command("yt-dlp", "--newline", "-o", filePath, videoURL)
+	err := cmd.Run()
 	if err != nil {
-		log.Println("Ошибка создания pipe:", err)
-		return c.Send("Произошла ошибка при подготовке к загрузке видео.")
+		log.Println("Ошибка скачивания видео:", err)
+		return c.Send("Не удалось скачать видео. Проверьте ссылку и попробуйте снова.")
 	}
-
-	if err := cmd.Start(); err != nil {
-		log.Println("Ошибка запуска команды:", err)
-		return c.Send("Произошла ошибка при запуске загрузки видео.")
-	}
-
-	// Читаем вывод yt-dlp в реальном времени
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Println(line) // Логируем весь вывод yt-dlp
-
-		// Парсим строку для получения процента загрузки
-		if strings.Contains(line, "[download]") {
-			parts := strings.Fields(line)
-			if len(parts) > 1 && strings.HasSuffix(parts[1], "%") {
-				progress := parts[1]
-				c.Send(fmt.Sprintf("Прогресс загрузки: %s", progress))
-			}
-		}
-	}
-
-	// Проверяем ошибки чтения
-	if err := scanner.Err(); err != nil {
-		log.Println("Ошибка чтения вывода yt-dlp:", err)
-		return c.Send("Произошла ошибка при чтении данных загрузки.")
-	}
-
-	// Ожидаем завершения команды
-	if err := cmd.Wait(); err != nil {
-		log.Println("Ошибка завершения команды yt-dlp:", err)
-		return c.Send("Произошла ошибка при завершении загрузки видео.")
-	}
-
 	video := &telebot.Video{File: telebot.FromDisk(filePath)}
 	if err := c.Send(video); err != nil {
 		log.Println("Ошибка отправки видео:", err)
@@ -102,4 +71,11 @@ func (b *Bot) HandleDownloadVideo(c telebot.Context) error {
 	}
 
 	return nil
+}
+
+func (b *Bot) handleYouTubeAuth(c telebot.Context) error {
+	// Запуск процесса авторизации через OAuth 2.0
+	authURL := b.Auth.StartAuth()
+	msg := "Перейдите по следующей ссылке для авторизации в YouTube: " + authURL
+	return c.Send(msg)
 }
