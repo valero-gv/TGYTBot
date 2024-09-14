@@ -13,6 +13,7 @@ type Auth struct {
 	Config *oauth2.Config
 	Token  *oauth2.Token
 	config *oauth2.Config
+	UserID int64
 }
 
 // Инициализация OAuth 2.0 конфигурации
@@ -51,7 +52,18 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Ошибка обмена кода на токен", http.StatusInternalServerError)
 		return
 	}
+	// Проверяем наличие обновляющего токена
+	if token.RefreshToken == "" {
+		http.Error(w, "Не удалось получить refresh token. Попробуйте еще раз.", http.StatusInternalServerError)
+		return
+	}
+
+	SaveToken(token)
 	a.Token = token
-	// Логика сохранения токена или использования его для API запросов
-	fmt.Fprintf(w, "Авторизация успешна! Токен: %s", token.AccessToken)
+
+	fmt.Println(token)
+
+	http.Redirect(w, r, "https://t.me/GVYT_bot", http.StatusFound)
+
+	fmt.Println("Авторизация успешна! Теперь вы можете вернуться в Telegram.")
 }

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"TGYTBot/internal/youtube"
+	"fmt"
 	"gopkg.in/telebot.v3"
 	"log"
 	"os"
@@ -19,6 +20,10 @@ var mainMenu = &telebot.ReplyMarkup{
 	ResizeKeyboard: true,
 }
 
+var authMenu = &telebot.ReplyMarkup{
+	ResizeKeyboard: true,
+}
+
 var (
 	btnDownload            = mainMenu.Text("Скачать видео")
 	btnAuthorize           = telebot.Btn{Text: "Авторизация в YouTube"}
@@ -28,7 +33,9 @@ var (
 func (b *Bot) InitHandlers() {
 	b.Bot.Handle("/start", b.handleStart)
 	b.Bot.Handle(&btnDownload, b.handleDownloadRequest)
+	b.Bot.Handle(&btnAuthorize, b.HandleDownloadVideo)
 	b.Bot.Handle(&btnAuthorize, b.handleYouTubeAuth)
+	b.Bot.Handle(&btnViewRecommendations, b.HandleGetRecommended)
 }
 
 // handleStart обработчик команды /start
@@ -36,6 +43,7 @@ func (b *Bot) handleStart(c telebot.Context) error {
 	mainMenu.Reply(
 		mainMenu.Row(btnDownload),
 		mainMenu.Row(btnAuthorize),
+		mainMenu.Row(btnViewRecommendations),
 	)
 	return c.Send("Выберите команду:", mainMenu)
 }
@@ -78,4 +86,42 @@ func (b *Bot) handleYouTubeAuth(c telebot.Context) error {
 	authURL := b.Auth.StartAuth()
 	msg := "Перейдите по следующей ссылке для авторизации в YouTube: " + authURL
 	return c.Send(msg)
+}
+
+func (b *Bot) HandleGetRecommended(c telebot.Context) error {
+	if err := b.Auth.CheckAndRefreshToken(); err != nil {
+		return c.Send("Ошибка обновления токена: " + err.Error())
+	}
+
+	// Получаем рекомендованные видео
+	videos, err := b.Auth.GetRecommendedVideos()
+	if err != nil {
+		_ = fmt.Errorf("ошибка получения видео: %v", err)
+		return c.Send(fmt.Sprintf("Ошибка получения видео: %v", err))
+	}
+
+	// Если видео нет
+	if len(videos) == 0 {
+		return c.Send("Нет рекомендованных видео.")
+	}
+	_, err = b.Bot.Send(c.Chat(), &telebot.Photo{
+		File: telebot.FromURL(videos[0].Snippet.Thumbnails.Default.Url),
+	})
+	if err != nil {
+		return c.Send(fmt.Sprintf("Ошибка отправки изображения: %v", err))
+	}
+	// Отправляем информацию о каждом видео
+	//for _, video := range videos {
+	//	// Создаем сообщение с превью и названием
+	//	//videoTitle := video.Snippet.Title
+	//	//videoThumbnail := video.Snippet.Thumbnails.Default.Url
+	//	//videoURL := fmt.Sprintf("https://www.youtube.com/watch?v=%s", video.Id)
+	//
+	//	_, err := b.Bot.Send(c.Chat(), "LOL")
+	//	if err != nil {
+	//		return c.Send(fmt.Sprintf("Ошибка отправки изображения: %v", err))
+	//	}
+	//}
+
+	return nil
 }

@@ -19,7 +19,7 @@ func main() {
 	}
 
 	pref := telebot.Settings{
-		Token:  "7387581650:AAFdFc-Ezn8pNnMYp09_CkVfeTcXKm60n8M", // Замените на ваш токен
+		Token:  cfg.TelegramToken, // Замените на ваш токен
 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
 	}
 
@@ -41,7 +41,14 @@ func main() {
 	}
 
 	myBot.InitHandlers()
-	bot.Handle(telebot.OnText, myBot.HandleDownloadVideo)
+
+	savedToken, err := youtube.LoadToken()
+	if err == nil && savedToken != nil {
+		myBot.Auth.Token = savedToken
+		fmt.Println("Токен загружен из файла.")
+	} else {
+		fmt.Println("Не удалось загрузить токен. Пользователю потребуется авторизация.")
+	}
 
 	go func() {
 		fmt.Println("Запуск Telegram бота...")
@@ -49,8 +56,10 @@ func main() {
 	}()
 
 	http.HandleFunc("/callback", auth.HandleCallback)
+
 	fmt.Println("Сервер запущен на http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
+
 }
