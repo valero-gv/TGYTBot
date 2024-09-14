@@ -1,6 +1,6 @@
 {
-  "telegram_token": "7387581650:AAFdFc-Ezn8pNnMYp09_CkVfeTcXKm60n8M",
-  "client_id": "318907218133-451t8nrf73k0ekc3lu7m8eilb47gogu1.apps.googleusercontent.com",
-  "client_secret": "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",
-  "redirect_url": "http://localhost:8080/callback"
+  "telegram_token": "",
+  "client_id": "",
+  "client_secret": "",
+  "redirect_url": ""
 }
